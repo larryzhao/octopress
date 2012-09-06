@@ -24,16 +24,18 @@ module Jekyll
   # The CategoryIndex class creates a single category page for the specified category.
   class CategoryIndex < Page
 
+    attr_accessor :locale
     # Initializes a new CategoryIndex.
     #
     #  +base+         is the String path to the <source>.
     #  +category_dir+ is the String path between <source> and the category folder.
     #  +category+     is the category currently being processed.
-    def initialize(site, base, category_dir, category)
+    def initialize(site, base, category_dir, category, locale)
       @site = site
       @base = base
       @dir  = category_dir
       @name = 'index.html'
+      @locale = locale
       self.process(@name)
       # Read the YAML data from the layout page.
       self.read_yaml(File.join(base, '_layouts'), 'category_index.html')
@@ -51,12 +53,14 @@ module Jekyll
   # The CategoryFeed class creates an Atom feed for the specified category.
   class CategoryFeed < Page
 
+    attr_accessor :locale
+
     # Initializes a new CategoryFeed.
     #
     #  +base+         is the String path to the <source>.
     #  +category_dir+ is the String path between <source> and the category folder.
     #  +category+     is the category currently being processed.
-    def initialize(site, base, category_dir, category)
+    def initialize(site, base, category_dir, category, locale)
       @site = site
       @base = base
       @dir  = category_dir
@@ -87,24 +91,28 @@ module Jekyll
     #  +category_dir+ is the String path to the category folder.
     #  +category+     is the category currently being processed.
     def write_category_index(category_dir, category)
-      index = CategoryIndex.new(self, self.source, category_dir, category)
-      index.render(self.layouts, site_payload)
-      index.write(self.dest)
-      # Record the fact that this page has been added, otherwise Site::cleanup will remove it.
-      self.pages << index
+      self.locales.each do |locale|
+        category_with_locale_dir = "/#{locale}/#{category_dir}"
+        index = CategoryIndex.new(self, self.source, category_with_locale_dir, category, locale)
+        index.render(self.layouts, site_payload)
+        index.write(self.dest)
+        # Record the fact that this page has been added, otherwise Site::cleanup will remove it.
+        self.pages << index
 
-      # Create an Atom-feed for each index.
-      feed = CategoryFeed.new(self, self.source, category_dir, category)
-      feed.render(self.layouts, site_payload)
-      feed.write(self.dest)
-      # Record the fact that this page has been added, otherwise Site::cleanup will remove it.
-      self.pages << feed
+        # Create an Atom-feed for each index.
+        feed = CategoryFeed.new(self, self.source, category_dir, category, locale)
+        feed.render(self.layouts, site_payload)
+        feed.write(self.dest)
+        # Record the fact that this page has been added, otherwise Site::cleanup will remove it.
+        self.pages << feed
+      end
     end
 
     # Loops through the list of category pages and processes each one.
     def write_category_indexes
       if self.layouts.key? 'category_index'
         dir = self.config['category_dir'] || 'categories'
+
         self.categories.keys.each do |category|
           self.write_category_index(File.join(dir, category.gsub(/_|\P{Word}/, '-').gsub(/-{2,}/, '-').downcase), category)
         end
@@ -140,10 +148,10 @@ module Jekyll
     #
     # Returns string
     #
-    def category_links(categories)
+    def category_links(categories, locale)
       dir = @context.registers[:site].config['category_dir']
       categories = categories.sort!.map do |item|
-        "<a class='category' href='/#{dir}/#{item.gsub(/_|\P{Word}/, '-').gsub(/-{2,}/, '-').downcase}/'>#{item}</a>"
+        "<a class='category' href='/#{locale}/#{dir}/#{item.gsub(/_|\P{Word}/, '-').gsub(/-{2,}/, '-').downcase}/'>#{item}</a>"
       end
 
       case categories.length
